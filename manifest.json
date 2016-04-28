@@ -1,0 +1,54 @@
+{
+  "manifest_version": 2,
+  "name": "__MSG_extName__",
+  "version": "0.1",
+
+  "default_locale": "en",
+  "description": "This extension combines functionality from SpanishDict.com and Quizlet.com to help you learn Spanish",
+  "icons": {
+	"16": "imgs/icon_16.png",
+	"38": "imgs/icon_38.png"
+  },
+
+  "browser_action": {
+    "default_icon": "imgs/icon_38.png",
+    "default_popup": "popup.html"
+  },
+  "options_ui": {
+	"page": "options.html",
+	"chrome_style": true
+  },
+
+  "author": "Eric Waters <ewaters@gmail.com>",
+  "background": {
+	"persistent": false,
+	"scripts": [
+	    "js/async-2.0.0-rc.3.min.js",
+		"js/jquery-2.2.3.min.js",
+		"js/util.js",
+		"js/quizlet.js",
+		"js/spanishdict.js",
+		"js/background.js"
+	]
+  },
+
+  "content_scripts": [
+    {
+		"matches": ["<all_urls>"],
+		"css": ["css/content.css"],
+		"js": ["js/content.js"]
+	}
+  ],
+
+  "permissions": [
+    "activeTab",
+	"contextMenus",
+	"alarms",
+    "storage",
+	"cookies",
+	"unlimitedStorage",
+	"https://quizlet.com/",
+	"http://www.spanishdict.com/"
+  ]
+}
+

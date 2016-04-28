@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Word selection</title>
+	<style>
+		body: { padding: 10px; }
+		.meaning .examples {
+			margin-left: 10px;	
+		}
+		.meaning .partOfSpeech {
+			color: #999;
+		}
+		.meaning .word, .meaning .translation {
+			font-size: large;
+		}
+		.meaning .examples {
+			margin-bottom: 10px;
+		}
+		#context {
+			background: #f6f6f6;
+			border: 1px solid #aaa;
+			padding: 10px;
+			text-align: center;
+			font-size: large;
+		}
+		#context .selection {
+			background: #a8d1ff;
+		}
+
+	</style>
+	<script src="js/jquery-2.2.3.min.js"></script>
+	<script src="js/async-2.0.0-rc.3.min.js"></script>
+	<script src="js/mustache-0.4.2.min.js"></script>
+	<script src="js/util.js"></script>
+	<script src="js/quizlet.js"></script>
+	<script src="js/spanishdict.js"></script>
+</head>
+
+<script id="meaningTmpl" type="text/data">
+	{{#meanings}}
+	<div class="meaning">
+		<div class="primary">
+			<b>{{number}}{{letter}}.</b>
+			<span class="word">{{title}}</span> -
+			<span class="translation">{{translation}}</span>
+			<span class="partOfSpeech">{{partOfSpeech}}</span>
+		</div>
+		<div class="examples">
+		{{#examples}}
+			<div class="example">
+				<div class="phrase">{{phrase}}</div>
+				<div class="definition">{{definition}}</div>
+			</div>
+		{{/examples}}
+		</div>
+	</div>
+	{{/meanings}}
+</script>
+
+<script id="quizletAddTmpl" type="text/data">
+	<div class="suggested">
+		<ul>
+			<li>Word: <input type="text" id="quizletAddWord" value="{{word}}"/></li>
+			<li>Definition: <input type="text" id="quizletAddDefinition" value="{{definition}}"/></li>
+			<li>Quizlet Set:
+			<select id="quizletSet">
+			{{#quizletSets.folders}}
+				<optgroup label="{{title}}">
+					{{#sets}}
+					<option value="{{url}}"{{#selected}}{{url}}{{/selected}}>{{title}}</option>
+					{{/sets}}
+				</optgroup>
+			{{/quizletSets.folders}}
+			</select>
+			</li>
+		</ul>
+	</div>
+	<button id="quizletAdd">Add to Set</button>
+</script>
+
+<body>
+	<div id="context">
+		<span class="before"></span>
+		<span class="selection"></span>
+		<span class="after"></span>
+	</div>
+
+	<div id="status">Looking that up on SpanishDict.com...</div>
+
+	<div id="quizlet"></div>
+	<div id="meanings"></div>
+
+	<script src="js/wordSelection.js"></script>
+</body>
+</html>
