@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"flag"
@@ -8,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 )
 
 var (
@@ -33,6 +35,43 @@ type entry struct {
 	Gerund       translation
 	Participle   translation
 	Conjugations map[string]map[string]conjugation
+}
+
+func splitStrFromEnd(str string, count int) (string, string) {
+	var runes []rune
+	for _, r := range str {
+		runes = append(runes, r)
+	}
+	var b1, b2 bytes.Buffer
+	for i, r := range runes {
+		// This is a 1-based position
+		fromEnd := len(runes) - i
+		if fromEnd > count {
+			b1.WriteRune(r)
+		} else {
+			b2.WriteRune(r)
+		}
+	}
+	return b1.String(), b2.String()
+}
+
+func (e *entry) inspectRegularity() {
+	inf := e.Infinitive[0]
+	reflexive := false
+	if strings.HasSuffix(inf, "se") {
+		reflexive = true
+		inf = strings.TrimSuffix(inf, "se")
+	}
+	root, ending := splitStrFromEnd(inf, 2)
+	switch ending {
+	case "ar":
+	case "er", "ir", "ír":
+	default:
+		log.Printf("Verb %q had unexpected ending %q", inf, ending)
+		return
+	}
+	return
+	log.Printf("Verb %q has root %q and ending %q reflexive %v", inf, root, ending, reflexive)
 }
 
 const (
@@ -109,7 +148,7 @@ func main() {
 	}
 
 	for _, e := range data {
-		// TODO: Check if the verb is irregular, and if so, how.
+		e.inspectRegularity()
 	}
 
 	b, err := json.Marshal(data)
