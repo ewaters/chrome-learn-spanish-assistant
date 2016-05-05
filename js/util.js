@@ -45,7 +45,6 @@ function fetchURL(options, cb) {
 		},
 		function(content, cb) {
 			if (content !== undefined) {
-				console.log("Found " + key + " in local datastore");
 				return cb(null, content);
 			}
 			console.log("Retrieving " + key);
@@ -63,6 +62,13 @@ function fetchURL(options, cb) {
 		if (err) {
 			console.error("fetchURL " + options.url + " failed: " + err);
 		}
+		if (!options.keepImages) {
+			result = stripImages(result);
+		}
 		cb(err, result);
 	});
+}
+
+function stripImages(content) {
+	return content.replace(/<img.+?>/gi, "");
 }

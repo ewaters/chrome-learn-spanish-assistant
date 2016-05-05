@@ -129,11 +129,17 @@ function getSentence(msg) {
 }
 
 function wordSelectionClicked(msg, info) {
-	chrome.windows.create({
+	var options = {
 		url: "wordSelection.html",
 		width: 500,
 		height: 300,
-		// TODO: Set 'left' and 'top' to appear near where the highlighted text is.
 		type: "popup",
-	});
+	};
+	if (msg.windowOffset && msg.selectionRect) {
+		// Position the top left of the new window on the top left of the
+		// selected text.
+		options.left = msg.selectionRect.left + msg.windowOffset.x;
+		options.top = msg.selectionRect.top + msg.windowOffset.y + (msg.windowOffset.outerH - msg.windowOffset.innerH);
+	}
+	chrome.windows.create(options);
 }
