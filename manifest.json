@@ -28,6 +28,7 @@
 		"js/util.js",
 		"js/quizlet.js",
 		"js/spanishdict.js",
+		"js/db.js",
 		"js/background.js"
 	]
   },

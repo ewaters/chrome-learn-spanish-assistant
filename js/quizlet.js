@@ -79,7 +79,7 @@ function quizletAjax(options, cb) {
 			};
 			$.ajax(options)
 				.done(function() { cb(null) })
-				.fail(function(jq, textStatus, errorThrown) { cb(textStatus) });
+				.fail(function(jq, textStatus) { cb(textStatus) });
 		},
 	], cb);
 }
@@ -96,9 +96,9 @@ function quizletWordInFolder(word, cb) {
 			keyFromLocal("quizletSets", cb);
 		},
 		function(data, cb) {
-			for (i in data.folders) {
-				folder = data.folders[i];
-				for (j in folder.terms) {
+			for (var i in data.folders) {
+				var folder = data.folders[i];
+				for (var j in folder.terms) {
 					if (wordMatchesTerm(word, folder.terms[j])) {
 						return cb(null, {
 							folder: folder,
@@ -226,19 +226,23 @@ function quizletFlashcardTerms(options, cb) {
 	if (options.url[0] === "/") {
 		options.url = "https://quizlet.com" + options.url;
 	}
-	fetchURL(options, function(err, content) {
-		if (err) { return cb(err); }
-		var re = new RegExp("Cards.init\\((.+)\\);");
-		var match = content.match(re);
-		if (match === null) {
-			return cb("Flashcards didn't match pattern");
-		}
-		var cards;
-		try {
-			cards = $.parseJSON(match[1]);
-		} catch (e) {
-			return cb("JSON parse failed: " + e);
-		}
-		cb(null, cards.terms);
-	});
+	async.waterfall([
+		function(cb) {
+			fetchURL(options, cb);
+		},
+		function(content, cb) {
+			var re = new RegExp("Cards.init\\((.+)\\);");
+			var match = content.match(re);
+			if (match === null) {
+				return cb("Flashcards didn't match pattern");
+			}
+			var cards;
+			try {
+				cards = $.parseJSON(match[1]);
+			} catch (e) {
+				return cb("JSON parse failed: " + e);
+			}
+			async.mapLimit(cards.terms, 10, addLemmas, cb);
+		},
+	], cb);
 }

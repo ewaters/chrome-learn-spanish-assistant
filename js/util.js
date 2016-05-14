@@ -1,3 +1,69 @@
+function getFreeling(text, cb) {
+	var cacheKey = "cache.freeling." + text;
+	async.waterfall([
+		function(cb) {
+			keyFromLocal(cacheKey, cb);
+		},
+		function(data, cb) {
+			if (data) {
+				return cb(null, data);
+			}
+			$.ajax({
+				url: "http://127.0.0.1:8080/freeling-es-json",
+				type: "POST",
+				data: { "text": text },
+			})
+			.done(function(data) {
+				keyToLocal(cacheKey, data, cb);
+			})
+			.fail(function(jq, textStatus) { cb(textStatus) });
+		},
+	], cb);
+}
+
+// addLemas takes a card struct like { word: "foo bar" } and passes the text
+// to freeling, adding { lemmas: ["foo", "bar"], tags: [ { ... }, ... ] }.
+function addLemmas(result, cb) {
+	if (!result.word) {
+		return cb("Invalid object: missing 'word' property");
+	}
+	async.waterfall([
+		function(cb) { getFreeling(result.word, cb) },
+		function(data, cb) {
+			var uniqLemmas = {};
+			result.tags = [];
+			for (var i in data) {
+				var para = data[i];
+				for (var j in para.tokens) {
+					var token = para.tokens[j];
+					uniqLemmas[token.lemma] = true;
+					result.tags.push({
+						// Copy in only the relevant data.
+						form: token.form,
+						lemma: token.lemma,
+						tag: token.tag,
+					});
+				}
+			}
+
+			result.lemmas = [];
+			for (var l in uniqLemmas) {
+				result.lemmas.push(l);
+			}
+			cb(null, result);
+		},
+	], cb);
+}
+
+function cbLogger(err, result) {
+	if (err) {
+		console.error(err);
+		return;
+	}
+	console.log(result);
+	window.cbLogRes = result;
+}
+
 function keyFromStorageArea(area, key, cb) {
 	area.get(key, function(data) {
 		if (chrome.runtime.lastError) {
@@ -56,7 +122,7 @@ function fetchURL(options, cb) {
 				.done(function(data) {
 					keyToLocal(key, data, cb);
 				})
-				.fail(function(jq, textStatus, errorThrown) { cb(textStatus) });
+				.fail(function(jq, textStatus) { cb(textStatus) });
 		}
 	], function(err, result) {
 		if (err) {

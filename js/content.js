@@ -1,7 +1,7 @@
 document.addEventListener('selectionchange', function() {
 	var sel = window.getSelection(),
         r = sel.rangeCount ? sel.getRangeAt(0) : null,
-	    msg = {
+		msg = {
 			request: 'updateContextMenu',
 			selection: sel.toString(),
 			windowOffset: {
@@ -20,7 +20,7 @@ document.addEventListener('selectionchange', function() {
 		if (rects.length >= 1) {
 			var rect = rects[0];
 			msg.selectionRect = {};
-			for (k in rect) {
+			for (var k in rect) {
 				msg.selectionRect[k] = rect[k];
 			}
 		}

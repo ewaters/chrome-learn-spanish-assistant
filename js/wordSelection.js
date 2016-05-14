@@ -49,6 +49,7 @@ function render(err, data) {
 	));
 
 	if (data.inFolder) {
+		// TODO: Implement
 	} else {
 		$("#quizlet").html(Mustache.to_html(
 			$("#quizletAddTmpl").text(),

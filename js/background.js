@@ -67,7 +67,8 @@ function alarmUpdateQuizletSets() {
 }
 
 // Listen for messages from the content script.
-chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+chrome.runtime.onMessage.addListener(function(msg) {
+	// Unused args: sender, sendResponse
     if (msg.request !== 'updateContextMenu') {
 		return;
 	}
@@ -128,7 +129,8 @@ function getSentence(msg) {
 	return msg;
 }
 
-function wordSelectionClicked(msg, info) {
+function wordSelectionClicked(msg) {
+	// Unused arg: info
 	var options = {
 		url: "wordSelection.html",
 		width: 500,

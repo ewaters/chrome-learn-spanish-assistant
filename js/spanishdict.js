@@ -172,7 +172,7 @@ function sdictParseDictEntry(node, cb) {
 		} else if (cls === "indent-1") {
 			var result = sdictParseMeaning(baseClass, child);
 			if (result.err) {
-				console.error(meaning);
+				console.error(child);
 				err = result.err;
 				return false;
 			}

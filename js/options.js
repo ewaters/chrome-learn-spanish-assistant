@@ -31,17 +31,17 @@ function restoreOptions() {
 }
 
 function optionsLoaded(items) {
-	document.getElementById('quizlet_id').value = items.quizletId;;
+	document.getElementById('quizlet_id').value = items.quizletId;
 	var select = $("#quizlet_set");
 	if (items.quizletSets !== undefined) {
-		for (i in items.quizletSets.folders) {
-			folder = items.quizletSets.folders[i];
-			optGroup = $("<optgroup/>");
+		for (var i in items.quizletSets.folders) {
+			var folder = items.quizletSets.folders[i];
+			var optGroup = $("<optgroup/>");
 			optGroup.attr("label", folder.title);
 			select.append(optGroup);
-			for (j in folder.sets) {
-				set = folder.sets[j];
-				opt = $("<option/>");
+			for (var j in folder.sets) {
+				var set = folder.sets[j];
+				var opt = $("<option/>");
 				opt.attr("value", set.url);
 				opt.append(set.title);
 				if (items.quizletSet === set.url) {
