@@ -2,6 +2,9 @@ function getFreeling(text, cb) {
 	var cacheKey = "cache.freeling." + text;
 	async.waterfall([
 		function(cb) {
+			if (cacheKey.length > 256) {
+				return cb(null, null);
+			}
 			keyFromLocal(cacheKey, cb);
 		},
 		function(data, cb) {
@@ -17,6 +20,31 @@ function getFreeling(text, cb) {
 				keyToLocal(cacheKey, data, cb);
 			})
 			.fail(function(jq, textStatus) { cb(textStatus) });
+		},
+	], cb);
+}
+
+function textToLemmas(text, cb) {
+	async.waterfall([
+		function(cb) { getFreeling(text, cb) },
+		function(data, cb) {
+			var result = {
+				uniq: [],
+				list: [],
+			};
+			var uniq = {};
+			for (var i in data) {
+				var para = data[i];
+				for (var j in para.tokens) {
+					var token = para.tokens[j];
+					uniq[token.ctag + ":::" + token.lemma] = token;
+					result.list.push(token);
+				}
+			}
+			for (var key in uniq) {
+				result.uniq.push(uniq[key]);
+			}
+			return cb(null, result);
 		},
 	], cb);
 }
@@ -100,10 +128,15 @@ function keyToSync(key, value, cb) {
 	return keyToStorageArea(chrome.storage.sync, key, value, cb);
 }
 
+var forceCache;
+
 function fetchURL(options, cb) {
 	var key = "fetchURL." + options.url;
 	async.waterfall([
 		function(cb) {
+			if (forceCache !== undefined) {
+				options.cache = forceCache;
+			}
 			if (options.cache === false) {
 				return cb(null, undefined);
 			}

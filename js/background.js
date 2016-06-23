@@ -27,16 +27,6 @@ chrome.runtime.onInstalled.addListener(function() {
 
 });
 
-function sdict(word) {
-	sdictDefineWord(word, function(err, result) {
-		if (err) {
-			console.error("Failed: " + err);
-		} else {
-			console.log(result);
-		}
-	});
-}
-
 // Set up an event on when a context menu is clicked.
 chrome.contextMenus.onClicked.addListener(function(info, tab) {
 	console.log("item " + info.menuItemId + " was clicked");
@@ -58,6 +48,7 @@ chrome.alarms.onAlarm.addListener(function(alarm) {
 });
 
 function alarmUpdateQuizletSets() {
+	forceCache = true;
 	quizletUpdate(function(err) {
 		if (err) {
 			console.log("quizletUpdate failed:");
@@ -140,8 +131,10 @@ function wordSelectionClicked(msg) {
 	if (msg.windowOffset && msg.selectionRect) {
 		// Position the top left of the new window on the top left of the
 		// selected text.
-		options.left = msg.selectionRect.left + msg.windowOffset.x;
-		options.top = msg.selectionRect.top + msg.windowOffset.y + (msg.windowOffset.outerH - msg.windowOffset.innerH);
+		// Use rounding as selectionRect may be fractional and windows.create
+		// requires integers.
+		options.left = Math.round(msg.selectionRect.left + msg.windowOffset.x);
+		options.top = Math.round(msg.selectionRect.top + msg.windowOffset.y + (msg.windowOffset.outerH - msg.windowOffset.innerH));
 	}
 	chrome.windows.create(options);
 }

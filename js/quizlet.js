@@ -1,3 +1,5 @@
+// quizletAddToPreferredSet calls quizletAddToSet with the set name from the
+// setting 'quizletSet'.
 function quizletAddToPreferredSet(data, cb) {
 	async.waterfall([
 		function(cb) {
@@ -10,21 +12,16 @@ function quizletAddToPreferredSet(data, cb) {
 	], cb);
 }
 
-/*
- * Call with data like:
- * {
- *   set: "/12345/set_name/",
- *   word: "spanish word",
- *   definition: "english word",
- * }
- * */
+// quizletAddToSet takes an object like
+// {
+//   set: "/12345/set_name/",
+//   word: "spanish word",
+//   definition: "english word",
+// }
+// and will add the word and definition to the end of the given set.
 function quizletAddToSet(data, cb) {
-	var match = data.set.match("^\/(\\d+)\/");
-	if (match === null) {
-		return cb("Set name '"+data.set+"' doesn't start with an ID");
-	}
-	data.setId = parseInt(match[1]);
-
+	// TODO: Normalize this.
+	data.url = data.set;
 	async.waterfall([
 		// TODO: Strictly speaking, we can skip this step if we want to place
 		// added terms at the top of the set rather than the bottom. This is
@@ -39,7 +36,20 @@ function quizletAddToSet(data, cb) {
 	], cb);
 }
 
+// quizletPostTerms is a helper for quizletAddToSet.
 function quizletPostTerms(data, cb) {
+	if (data.url === undefined) {
+		console.error(data);
+		return cb("quizletSetTerms called without url");
+	}
+	if (data.setId === undefined) {
+		var match = data.url.match("^\/(\\d+)\/");
+		if (match === null) {
+			return cb("Set name '"+data.url+"' doesn't start with an ID");
+		}
+		data.setId = parseInt(match[1]);
+	}
+
 	var payload = {
 		requestId: Date.now() + ":term:op-seq-0|op-seq-1|op-seq-2",
 		data: [{
@@ -58,6 +68,8 @@ function quizletPostTerms(data, cb) {
 	quizletAjax(options, cb);
 }
 
+// quizletAjax is a generic AJAX helper for making a request to Quizlet, using
+// the XSS token found in the cookie.
 function quizletAjax(options, cb) {
 	async.waterfall([
 		function(cb) {
@@ -84,11 +96,17 @@ function quizletAjax(options, cb) {
 	], cb);
 }
 
+// wordMatchesTerm is a helper for quizletWordInFolder.
 function wordMatchesTerm(word, term) {
 	// var termParts = term.word.toLowerCase().split(" ");
 	return term.word.toLowerCase().match("\\b" + word + "\\b") !== null;
 }
 
+// quizletWordInFolder is given a term to search all folders. If it's found,
+// the return (via cb) will be {
+//   folder: <folder spec>
+//   term: <term spec>
+// }
 function quizletWordInFolder(word, cb) {
 	word = word.toLowerCase();
 	async.waterfall([
@@ -112,31 +130,58 @@ function quizletWordInFolder(word, cb) {
 	], cb);
 }
 
+// quizletUpdate updates all the state of the Quizlet folders and sets and
+// caches the result, along with returning (via cb).
 function quizletUpdate(cb) {
 	var qzData;
 	async.waterfall([
 		function(cb) {
 			keyFromSync("quizletId", cb);
 		},
-		quizletHome,
+		function(id, cb) {
+			quizletHome({ id: id }, cb);
+		},
 		function(data, cb) {
+			console.log(data);
 			qzData = data;
-			async.map(data.folders, quizletFolderInfo, cb);
+			async.mapLimit(data.folders, 2, quizletFolderInfo, cb);
 		},
 		function(folders, cb) {
+			console.log(folders);
 			qzData.folders = folders;
+			async.mapLimit(qzData.sets, 2, quizletSetTerms, cb);
+		},
+		function(sets, cb) {
+			console.log(sets);
+			qzData.sets = sets;
 			keyToLocal("quizletSets", qzData, cb);
 		},
 	], cb);
 }
 
-function quizletHome(quizletId, cb) {
-	if (!quizletId) {
+// quizletHome is passed the Quizlet user ID via { id: <num> }
+//
+// Returns (via cb) {
+//   sets: [
+//     {
+//       title: ...
+//       url: ...
+//       termCount: <num>
+//     }
+//   ]
+//   folders: [
+//     {
+//       title: ...
+//       url: ...
+//     }
+//   ]
+// }
+function quizletHome(options, cb) {
+	if (!options.id) {
 		return cb("Quizlet id is missing");
 	}
-	fetchURL({
-		url: "https://quizlet.com/" + quizletId,
-	}, function(err, content) {
+	options.url = "https://quizlet.com/" + options.id;
+	fetchURL(options, function(err, content) {
 		if (err) { return cb(err); }
 
 		var data = {
@@ -151,7 +196,7 @@ function quizletHome(quizletId, cb) {
 			var set = {
 				title: article.find('.title-text').text(),
 				url:   article.find("a").attr("href"),
-				terms: parseInt(article.find('small').text().split(" ")[0]),
+				termCount: parseInt(article.find('small').text().split(" ")[0]),
 			};
 			data.sets.push(set);
 		});
@@ -172,6 +217,21 @@ function quizletHome(quizletId, cb) {
 	});
 }
 
+// quizletFolderInfo gets the list of sets and terms for the folder.
+//
+// Pass object with { url: <folder url> }
+// Returns (via cb) object mixed in { 
+//   sets: [
+//     {
+//       title: ...
+//       url: ...
+//       termCount: <num>
+//     }
+//   ]
+//   terms: [
+//     <term spec>
+//   ]
+// }
 function quizletFolderInfo(data, cb) {
 	async.waterfall([
 		function (cb) {
@@ -181,9 +241,32 @@ function quizletFolderInfo(data, cb) {
 	], cb);
 }
 
+// quizletFolderSets is a helper for quizletFolderInfo.
+function quizletFolderSets(data, cb) {
+	fetchURL({
+		url: "https://quizlet.com" + data.url + "/sets",
+		cache: false,
+	}, function(err, content) {
+		if (err) { return cb(err); }
+		data.sets = [];
+		var html = $(content);
+		html.find(".set-preview").each(function(idx, node) {
+			var article = $(node);
+			var set = {
+				title: article.find('.title-text').text(),
+				url:   article.find("a").attr("href"),
+				termCount: parseInt(article.find('small').text().split(" ")[0]),
+			};
+			data.sets.push(set);
+		});
+		cb(null, data);
+	});
+}
+
 function quizletFolderTerms(data, cb) {
 	quizletFlashcardTerms({
 		url: data.url + "/flashcards",
+		cache: false,
 	}, function(err, terms) {
 		if (err) { return cb(err); }
 		data.terms = terms;
@@ -192,6 +275,18 @@ function quizletFolderTerms(data, cb) {
 }
 
 function quizletSetTerms(data, cb) {
+	if (data.url === undefined) {
+		console.error(data);
+		return cb("quizletSetTerms called without url");
+	}
+	if (data.setId === undefined) {
+		var match = data.url.match("^\/(\\d+)\/");
+		if (match === null) {
+			return cb("Set name '"+data.url+"' doesn't start with an ID");
+		}
+		data.setId = parseInt(match[1]);
+	}
+
 	quizletFlashcardTerms({
 		url: "/" + data.setId + "/flashcards",
 		cache: false,
@@ -202,26 +297,8 @@ function quizletSetTerms(data, cb) {
 	});
 }
 
-function quizletFolderSets(data, cb) {
-	fetchURL({
-		url: "https://quizlet.com" + data.url + "/sets",
-	}, function(err, content) {
-		if (err) { return cb(err); }
-		data.sets = [];
-		var html = $(content);
-		html.find(".set-preview").each(function(idx, node) {
-			var article = $(node);
-			var set = {
-				title: article.find('.title-text').text(),
-				url:   article.find("a").attr("href"),
-				terms: parseInt(article.find('small').text().split(" ")[0]),
-			};
-			data.sets.push(set);
-		});
-		cb(null, data);
-	});
-}
-
+// quizletFlashcardTerms takes a '/flashcards' URL on { url: ... } and returns
+// (via cb) an array of term specs.
 function quizletFlashcardTerms(options, cb) {
 	if (options.url[0] === "/") {
 		options.url = "https://quizlet.com" + options.url;
@@ -243,6 +320,49 @@ function quizletFlashcardTerms(options, cb) {
 				return cb("JSON parse failed: " + e);
 			}
 			async.mapLimit(cards.terms, 10, addLemmas, cb);
+		},
+	], cb);
+}
+
+function quizletWriteToDB(cb) {
+	var db;
+	async.waterfall([
+		openDefaultDatabase,
+		function(_db, cb) {
+			db = _db;
+			keyFromLocal("quizletSets", cb);
+		},
+		function(qzData, cb) {
+			var t = db.transaction([osSets, osCards], "readwrite");
+			attachTransaction(t, cb);
+
+			var cards = t.objectStore(osCards);
+			var sets = t.objectStore(osSets);
+			for (var i in qzData.sets) {
+				var set = qzData.sets[i];
+				var setID = "quizlet" + set.url;
+				sets.add({
+					id: setID,
+					url: set.url,
+					title: set.title,
+				});
+
+				for (var j in set.terms) {
+					var term = set.terms[j];
+					cards.add({
+						set: set.url,
+						// Copy fields from term.
+						word:       term.word,
+						definition: term.definition,
+						lemmas:     term.lemmas,
+						tags:       term.tags,
+					});
+				}
+			}
+		},
+		function(cb) {
+			db.close();
+			cb();
 		},
 	], cb);
 }

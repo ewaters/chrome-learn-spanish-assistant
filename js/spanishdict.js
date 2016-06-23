@@ -1,3 +1,7 @@
+function sdict(word) {
+	sdictDefineWord(word, cbLogger);
+}
+
 function sdictDefineWord(word, cb) {
 	word = word.toLowerCase();
 	async.waterfall([
@@ -151,6 +155,11 @@ function sdictParseDictEntry(node, cb) {
 			return;
 		}
 
+		// Not what I'm looking for - could be a 'dictionary-untext'
+		// and be an '<ol>' (see 'una vez que').
+		if (child.attr("class") === undefined) {
+			return false;
+		}
 		var classes = child.attr("class").split(/\s+/);
 		if (classes.length !== 1) {
 			console.error(child);
