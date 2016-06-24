@@ -61,6 +61,14 @@ function openDatabase(name, version, cb) {
 	};
 }
 
+function clearDatabase(db, cb) {
+	var t = db.transaction([osSets, osCards], "readwrite");
+	attachTransaction(t, cb);
+
+	t.objectStore(osSets).clear();
+	t.objectStore(osCards).clear();
+}
+
 function cardsWithLemma(lemma, db, cb) {
 	var t = db.transaction([osCards]);
 	attachTransaction(t, cb);
@@ -147,7 +155,9 @@ function unknownLemmas(text, cb) {
 			}, cb);
 		},
 		function (records, cb) {
+			/*
 			var byPOS = {};
+			var byLemma = {};
 			for (var i in records) {
 				var record = records[i];
 				// Skip looking at any lemmas that are in any flashcards,
@@ -155,6 +165,7 @@ function unknownLemmas(text, cb) {
 				if (record.cards.length > 0) {
 					continue;
 				}
+				byLemma[record.lemma] = record;
 				for (var j in record.tokens) {
 					var token = record.tokens[j];
 					if (byPOS[token.pos] === undefined) {
@@ -165,6 +176,10 @@ function unknownLemmas(text, cb) {
 			}
 
 			var all = [];
+			for (var lemma in byLemma) {
+				all.push(byLemma[lemma].lemma.replace(/_/g, " "));
+			}
+
 			for (var pos in byPOS) {
 				var set = {};
 				for (var i in byPOS[pos]) {
@@ -174,37 +189,59 @@ function unknownLemmas(text, cb) {
 				for (var lemma in set) {
 					var l = lemma.replace(/_/g, " ");
 					lemmas.push(l);
-					all.push(l);
 				}
 				lemmas.sort();
 				console.log("Part of speech: " + pos);
 				console.log("   " + lemmas.join(", "));
 			}
+			*/
 
-			async.mapSeries(all, function(lemma, cb) {
-				sdictDefineWord(lemma, function(err, result) {
+			var unknown = [];
+			for (var i in records) {
+				var record = records[i];
+				if (record.cards.length > 0) {
+					continue;
+				}
+				unknown.push(record);
+			}
+
+			async.mapSeries(unknown, function(record, cb) {
+				record.lookup = record.lemma.replace(/_/g, " ");
+				sdictDefineWord(record.lookup, function(err, result) {
 					if (err) {
 						return cb(err);
 					}
-					result.lemma = lemma;
-					var time = Math.round(Math.random() * 500);
-					window.setTimeout(function() {
-						return cb(null, result);
-					}, time);
+					for (var key in record) {
+						result[key] = record[key];
+					}
+					return cb(null, result);
 				});
 			}, cb);
 		},
 		function (results, cb) {
+			/*
+			var postData = {
+				setId: 143847158,
+				terms: [],
+			};
+			*/
+			var found = [];
 			for (var i in results) {
 				var result = results[i];
+				var lc = result.word.toLowerCase();
 				if (result.entries.length === 0) {
 					console.log("Lemma '" + result.lemma + "' wasn't found");
+				} else if (result.definition === undefined || result.definition.length === 0) {
+					console.log("Lemma '" + result.lemma + "' found word '" + result.word + "' but no definition");
+				} else if (lc !== "el " + result.lookup && lc !== "la " + result.lookup && lc !== result.lookup) {
+					console.log("Lemma '" + result.lemma + "' (" + result.tokens[0].tag + ") != '" + result.word + "': '" + result.definition + "'");
 				} else {
-					console.log(result.word + ": " + result.definition);
+					found.push(result);
 				}
 			}
 			db.close();
-			cb();
+			//quizletPostTerms(postData, cb);
+			cb(null, found);
 		},
 	], cb);
 }

@@ -24,7 +24,6 @@ chrome.runtime.onInstalled.addListener(function() {
 	});
 	*/
 	alarmUpdateQuizletSets();
-
 });
 
 // Set up an event on when a context menu is clicked.

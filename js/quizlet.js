@@ -31,18 +31,18 @@ function quizletAddToSet(data, cb) {
 		},
 		function(data, cb) {
 			data.rank = data.terms.length;
-			quizletPostTerms(data, cb)
+			quizletPostTerm(data, cb)
 		},
 	], cb);
 }
 
-// quizletPostTerms is a helper for quizletAddToSet.
-function quizletPostTerms(data, cb) {
-	if (data.url === undefined) {
-		console.error(data);
-		return cb("quizletSetTerms called without url");
-	}
+// quizletPostTerm is a helper for quizletAddToSet.
+function quizletPostTerm(data, cb) {
 	if (data.setId === undefined) {
+		if (data.url === undefined) {
+			console.error(data);
+			return cb("quizletSetTerms called without url");
+		}
 		var match = data.url.match("^\/(\\d+)\/");
 		if (match === null) {
 			return cb("Set name '"+data.url+"' doesn't start with an ID");
@@ -66,6 +66,46 @@ function quizletPostTerms(data, cb) {
 		contentType: "application/json",
 	};
 	quizletAjax(options, cb);
+}
+
+/*
+data = {
+  setId: ...,
+  terms: [{
+    defintion: ...,
+	word: ...,
+  }, ...],
+}
+*/
+function quizletPostTerms(postData, cb) {
+	async.waterfall([
+		function (cb) {
+			var data = {
+				setId: postData.setId,
+			};
+			quizletSetTerms(data, cb);
+		},
+		function(data, cb) {
+			var rank = data.terms.length;
+			var payload = {
+				requestId: Date.now() + ":term:op-seq-0|op-seq-1|op-seq-2",
+				data: [],
+			};
+			for (var i in postData.terms) {
+				var term = postData.terms[i];
+				term.rank = rank++;
+				term.setId = postData.setId;
+				payload.data.push(term);
+			}
+			var options = {
+				url: "https://quizlet.com/webapi/3.1/terms",
+				type: "POST",
+				data: JSON.stringify(payload),
+				contentType: "application/json",
+			};
+			quizletAjax(options, cb);
+		},
+	], cb);
 }
 
 // quizletAjax is a generic AJAX helper for making a request to Quizlet, using
@@ -275,11 +315,11 @@ function quizletFolderTerms(data, cb) {
 }
 
 function quizletSetTerms(data, cb) {
-	if (data.url === undefined) {
-		console.error(data);
-		return cb("quizletSetTerms called without url");
-	}
 	if (data.setId === undefined) {
+		if (data.url === undefined) {
+			console.error(data);
+			return cb("quizletSetTerms called without url");
+		}
 		var match = data.url.match("^\/(\\d+)\/");
 		if (match === null) {
 			return cb("Set name '"+data.url+"' doesn't start with an ID");
@@ -330,6 +370,9 @@ function quizletWriteToDB(cb) {
 		openDefaultDatabase,
 		function(_db, cb) {
 			db = _db;
+			clearDatabase(db, cb);
+		},
+		function (cb) {
 			keyFromLocal("quizletSets", cb);
 		},
 		function(qzData, cb) {
