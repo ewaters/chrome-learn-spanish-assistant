@@ -1,5 +1,6 @@
 var wordSelectionID = null,
 	wordSelectionMessage,
+	textSelectionMessage,
 	sdictPageID = "ctxMenuSDictPage";
 
 // Set up context menu tree at install time.
@@ -32,7 +33,13 @@ chrome.contextMenus.onClicked.addListener(function(info, tab) {
 	console.log("info: " + JSON.stringify(info));
 	console.log("tab: " + JSON.stringify(tab));
 	if (info.menuItemId === wordSelectionID) {
-		wordSelectionClicked(wordSelectionMessage, info);
+		if (wordSelectionMessage !== null) {
+			wordSelectionClicked(wordSelectionMessage, info);
+		} else if (textSelectionMessage !== null) {
+			textSelectionClicked(textSelectionMessage, info);
+		} else {
+			console.log("Nothing to show - all is null");
+		}
 		return;
 	}
 });
@@ -67,6 +74,24 @@ chrome.runtime.onMessage.addListener(function(msg) {
 		if (wordSelectionID !== null) {
 			chrome.contextMenus.remove(wordSelectionID);
 			wordSelectionID = null;
+		}
+		return;
+	}
+
+	wordSelectionMessage = textSelectionMessage = null;
+
+	if (msg.selection.length > 100) {
+		var options = {
+			title: "Find unknown Spanish words in selected text",
+			contexts: ["selection"],
+		};
+		console.log(msg);
+		textSelectionMessage = msg;
+		if (wordSelectionID !== null) {
+			chrome.contextMenus.update(wordSelectionID, options);
+		} else {
+			options.id = "ctxMenuWordSelectionID";
+			wordSelectionID = chrome.contextMenus.create(options);
 		}
 		return;
 	}
@@ -135,5 +160,16 @@ function wordSelectionClicked(msg) {
 		options.left = Math.round(msg.selectionRect.left + msg.windowOffset.x);
 		options.top = Math.round(msg.selectionRect.top + msg.windowOffset.y + (msg.windowOffset.outerH - msg.windowOffset.innerH));
 	}
+	chrome.windows.create(options);
+}
+
+function textSelectionClicked(msg) {
+	// Unused arg: info
+	var options = {
+		url: "textSelection.html",
+		width: 800,
+		height: 600,
+		type: "popup",
+	};
 	chrome.windows.create(options);
 }
