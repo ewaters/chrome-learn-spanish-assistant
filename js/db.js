@@ -1,8 +1,9 @@
 const dbName = "flashcards",
-	dbVersion = 1,
+	dbVersion = 2,
 	osSets = "sets",
 	osCards = "cards",
-	idxLemmas = "lemmas";
+	idxLemmas = "lemmas",
+	osKnown = "known";
 
 const dbStructure = {
 	cards: [
@@ -53,6 +54,10 @@ function openDatabase(name, version, cb) {
 			db.createObjectStore(osSets, { keyPath: "id" });
 			var cards = db.createObjectStore(osCards, { autoIncrement: true });
 			cards.createIndex(idxLemmas, "lemmas", { multiEntry: true });
+		}
+		if (evt.oldVersion < 2) {
+			var known = db.createObjectStore(osKnown, { autoIncrement: true });
+			known.createIndex(idxLemmas, "lemma", { unique: true });
 		}
 		// onsuccess will follow.
 	};

@@ -1,7 +1,12 @@
 var msg = chrome.extension.getBackgroundPage().textSelectionMessage;
 document.addEventListener('DOMContentLoaded', init);
 
+var dt, dtColumns, clicked, lemmaData, inputCell = null;
+
 function init() {
+	if (!msg || !msg.selection) {
+		return render("msg.selection is not set");
+	}
 	return unknownLemmas(msg.selection, render);
 }
 
@@ -12,37 +17,88 @@ function render(err, data) {
 	}
 	$("#status").remove();
 
-	var dataSet = [];
-	for (var i in data) {
-		var item = data[i];
-		dataSet.push([
-			item.lemma,
-			item.word,
-			item.definition,
-		]);
-	}
-	$('#table').DataTable({
-		data: dataSet,
-		columns: [
-			{ title: "Lemma" },
-			{ title: "Word" },
-			{ title: "Definition" },
-		],
+	lemmaData = data;
+	dtColumns = [
+		{ data: "lemma", title: "Lemma" },
+		{ data: "word", title: "Word" },
+		{ data: "definition", title: "Definition" },
+	];
+
+	dt = $('#table').DataTable({
+		data: data,
+		columns: dtColumns,
 		initComplete: function () {
 			var api = this.api();
-			api.$('td').click(function () {
-				api.search(this.innerHTML).draw();
-			});
+			api.$('td').click(cellClicked);
 		},
 	});
-	$('#table tbody').on('click', 'tr', function () {
-		var elem = $(this);
-		if (elem.hasClass('selected')) {
-			elem.removeClass('selected');
+	$('#table tbody').on('click', 'tr', rowClicked);
+	$('#button').on('click', buttonClicked);
+}
+
+function cellClicked (evt) {
+	if (!evt.shiftKey) {
+		return;
+	}
+	console.log(evt);
+	clicked = this;
+	var cell = dt.cell(this).index();
+
+	if (inputCell !== null) {
+		if (inputCell.row === cell.row && inputCell.column === cell.column) {
+			// Clicked in the same cell again, maybe in the text
+			// input. Ignore this.
+			return;
 		}
-		else {
-			elem.addClass('selected');
-		}
+	}
+	console.log("Clicked " + this.innerHTML + " index " + cell.row);
+	var key = dtColumns[cell.column].data;
+
+	var contents = dt.data()[ cell.row ][ key ];
+	var escaped = contents.replace('"', '\\"').replace("'", "\\'");
+	dt.data()[ cell.row ][ key ] = "<input type='text' value='" + escaped + "'/>";
+	//dt.data()[ cell.row ][0] += ".";
+	dt.rows().invalidate().draw();
+
+	$(this).find("input").on("blur", function() {
+		dt.data()[ cell.row ][ key ] = $(this).val();
+		dt.rows().invalidate().draw();
 	});
 
+	$(this).find("input").focus();
+	inputCell = cell;
+}
+
+const omitClass = 'omit';
+
+function rowClicked() {
+	var elem = $(this);
+	if (elem.hasClass(omitClass)) {
+		elem.removeClass(omitClass);
+	}
+	else {
+		elem.addClass(omitClass);
+	}
+}
+
+function buttonClicked() {
+	console.log(retrieve(false));
+	console.log(retrieve(true));
+}
+
+function retrieve(wantOmitted) {
+	var omitted = dt.rows('.' + omitClass)[0];
+	var omitIdx = {};
+	for (var i in omitted) {
+		omitIdx[omitted[i]] = true;
+	}
+
+	var ret = [];
+	dt.data().each(function(row, i) {
+		if ((wantOmitted && !omitIdx[i]) || (!wantOmitted && omitIdx[i])) {
+			return;
+		}
+		ret.push(row);
+	});
+	return ret;
 }

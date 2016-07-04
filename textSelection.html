@@ -15,12 +15,19 @@
 
 	<link rel="stylesheet" type="text/css" href="js/DataTables/datatables.min.css"/>
 	<script type="text/javascript" src="js/DataTables/datatables.min.js"></script>
+	<style>
+		#table tr.omit {
+			text-decoration: line-through;
+		}
+	</style>
 </head>
 
 <body>
 	<div id="status">Processing...</div>
 
 	<table id="table" class="display" width="100%"></table>
+
+	<button id="button">Submit</button>
 
 	<script src="js/textSelection.js"></script>
 </body>
