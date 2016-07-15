@@ -38,7 +38,12 @@ function attachRequest(r, cb) {
 	r.onerror = function(evt) { cb(evt.target.error) };
 }
 
+var overrideDefaultDatabase;
+
 function openDefaultDatabase(cb) {
+	if (overrideDefaultDatabase !== undefined) {
+		return openDatabase(overrideDefaultDatabase.name, overrideDefaultDatabase.version, cb);
+	}
 	return openDatabase(dbName, dbVersion, cb);
 }
 
@@ -72,6 +77,40 @@ function clearDatabase(db, cb) {
 
 	t.objectStore(osSets).clear();
 	t.objectStore(osCards).clear();
+}
+
+function doWithDb(f, cb) {
+	if (cb === undefined) {
+		cb = cbLogger;
+	}
+	var db;
+	async.waterfall([
+		openDefaultDatabase,
+		function(_db, cb) {
+			db = _db;
+			f(db, cb);
+		},
+		function(result, cb) {
+			if (cb === undefined) {
+				cb = result;
+				result = undefined;
+			}
+			db.close();
+			if (result === undefined) {
+				return cb(null);
+			} else {
+				return cb(null, result);
+			}
+		},
+	], cb);
+}
+
+function doWithTransaction(stores, mode, f, cb) {
+	doWithDb(function(db, cb) {
+		var t = db.transaction(stores, mode);
+		attachTransaction(t, cb);
+		f(t, cb);
+	}, cb);
 }
 
 function cardsWithLemma(lemma, db, cb) {
@@ -116,8 +155,16 @@ function unknownLemmas(text, cb) {
 	if (cb === undefined) {
 		cb = cbLogger;
 	}
+	var knownLemmas = {};
 	var db;
 	async.waterfall([
+		getKnownWords,
+		function(items, cb) {
+			items.forEach(function(item) {
+				knownLemmas[item.lemma] = true;
+			});
+			cb();
+		},
 		openDefaultDatabase,
 		function(_db, cb) {
 			db = _db;
@@ -160,51 +207,13 @@ function unknownLemmas(text, cb) {
 			}, cb);
 		},
 		function (records, cb) {
-			/*
-			var byPOS = {};
-			var byLemma = {};
-			for (var i in records) {
-				var record = records[i];
-				// Skip looking at any lemmas that are in any flashcards,
-				// regardless of what part of speech they are. This is naive.
-				if (record.cards.length > 0) {
-					continue;
-				}
-				byLemma[record.lemma] = record;
-				for (var j in record.tokens) {
-					var token = record.tokens[j];
-					if (byPOS[token.pos] === undefined) {
-						byPOS[token.pos] = [];
-					}
-					byPOS[token.pos].push(token);
-				}
-			}
-
-			var all = [];
-			for (var lemma in byLemma) {
-				all.push(byLemma[lemma].lemma.replace(/_/g, " "));
-			}
-
-			for (var pos in byPOS) {
-				var set = {};
-				for (var i in byPOS[pos]) {
-					set[ byPOS[pos][i].lemma ] = true;
-				}
-				var lemmas = [];
-				for (var lemma in set) {
-					var l = lemma.replace(/_/g, " ");
-					lemmas.push(l);
-				}
-				lemmas.sort();
-				console.log("Part of speech: " + pos);
-				console.log("   " + lemmas.join(", "));
-			}
-			*/
-
 			var unknown = [];
 			for (var i in records) {
 				var record = records[i];
 				if (record.cards.length > 0) {
+					continue;
+				}
+				if (knownLemmas[record.lemma]) {
 					continue;
 				}
 				unknown.push(record);
@@ -224,12 +233,6 @@ function unknownLemmas(text, cb) {
 			}, cb);
 		},
 		function (results, cb) {
-			/*
-			var postData = {
-				setId: 143847158,
-				terms: [],
-			};
-			*/
 			var found = [];
 			for (var i in results) {
 				var result = results[i];
@@ -240,12 +243,10 @@ function unknownLemmas(text, cb) {
 					console.log("Lemma '" + result.lemma + "' found word '" + result.word + "' but no definition");
 				} else if (lc !== "el " + result.lookup && lc !== "la " + result.lookup && lc !== result.lookup) {
 					console.log("Lemma '" + result.lemma + "' (" + result.tokens[0].tag + ") != '" + result.word + "': '" + result.definition + "'");
-				} else {
-					found.push(result);
 				}
+				found.push(result);
 			}
 			db.close();
-			//quizletPostTerms(postData, cb);
 			cb(null, found);
 		},
 	], cb);
@@ -287,6 +288,30 @@ function searchCards(search, cb) {
 	], cb);
 }
 
+function storeKnownWords(data, cb) {
+	doWithTransaction([osKnown], "readwrite", function(t) {
+		var known = t.objectStore(osKnown);
+		for (var i in data) {
+			known.add(data[i]);
+		}
+	}, cb);
+}
+
+function getKnownWords(cb) {
+	doWithTransaction([osKnown], "readonly", function(t, cb) {
+		var result = [];
+		t.oncomplete = function() { cb(null, result) };
+		t.objectStore(osKnown).openCursor().onsuccess = function(evt) {
+			var cursor = evt.target.result;
+			if (!cursor) {
+				return;
+			}
+			result.push(cursor.value);
+			cursor.continue();
+		};
+	}, cb);
+}
+
 function testDatabase(lemmaSearch) {
 	if (!lemmaSearch) {
 		lemmaSearch = "el";
@@ -303,10 +328,23 @@ function testDatabase(lemmaSearch) {
 			lemmas: ["el", "padre"],
 		},
 	];
+	var knownWords = [
+		{
+			lemma: "señor",
+			word: "El señor",
+			defintion: "Man, sir",
+		},
+	];
+
 	var testDBName = "testDatabase";
+	overrideDefaultDatabase = {
+		name: testDBName,
+		version: 2,
+	};
+
 	var db;
 	async.waterfall([
-		function(cb) { openDatabase(testDBName, 1, cb) },
+		openDefaultDatabase,
 		function(_db, cb) {
 			db = _db;
 			var t = db.transaction([osCards], "readwrite");
@@ -321,12 +359,32 @@ function testDatabase(lemmaSearch) {
 			cardsWithLemma(lemmaSearch, db, cb);
 		},
 		function(result, cb) {
+			// TODO: Add an assert here.
 			console.log(result);
 			console.log(JSON.stringify(result));
 			db.close();
+			storeKnownWords(knownWords, cb);
+		},
+		function(cb) {
+			console.log("Known words stored. Now retrieving");
+			getKnownWords(cb);
+		},
+		function(result, cb) {
+			var got = JSON.stringify(result),
+				want = JSON.stringify(knownWords);
+			if (got !== want) {
+				console.error("Known words mismatch");
+				console.log({ got: result, want: knownWords });
+			} else {
+				console.log("Known words match.");
+			}
+			cb();
+		},
+		function(cb) {
 			attachRequest(indexedDB.deleteDatabase(testDBName), cb);
 		},
 	], function(err) {
+		overrideDefaultDatabase = undefined;
 		if (err) {
 			console.error(err);
 			return;

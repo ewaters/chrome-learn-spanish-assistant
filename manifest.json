@@ -6,8 +6,8 @@
   "default_locale": "en",
   "description": "This extension combines functionality from SpanishDict.com and Quizlet.com to help you learn Spanish",
   "icons": {
-	"16": "imgs/icon_16.png",
-	"38": "imgs/icon_38.png"
+        "16": "imgs/icon_16.png",
+        "38": "imgs/icon_38.png"
   },
 
   "browser_action": {
@@ -15,41 +15,58 @@
     "default_popup": "popup.html"
   },
   "options_ui": {
-	"page": "options.html",
-	"chrome_style": true
+        "page": "options.html",
+        "chrome_style": true
   },
 
   "author": "Eric Waters <ewaters@gmail.com>",
   "background": {
-	"persistent": false,
-	"scripts": [
-	    "js/async-2.0.0-rc.3.min.js",
-		"js/jquery-2.2.3.min.js",
-		"js/util.js",
-		"js/quizlet.js",
-		"js/spanishdict.js",
-		"js/db.js",
-		"js/background.js"
-	]
+        "persistent": false,
+        "scripts": [
+            "js/async-2.0.0-rc.3.min.js",
+            "js/jquery-2.2.3.min.js",
+            "js/firebase-3.2.0.min.js",
+            "js/util.js",
+            "js/quizlet.js",
+            "js/spanishdict.js",
+            "js/db.js",
+            "js/lib/firebase.js",
+            "js/lib/supermemo.js",
+			"js/lib/jehle.js",
+            "js/background.js"
+        ]
   },
 
   "content_scripts": [
     {
-		"matches": ["<all_urls>"],
-		"css": ["css/content.css"],
-		"js": ["js/content.js"]
-	}
+      "matches": ["<all_urls>"],
+      "css": ["css/content.css"],
+      "js": ["js/content.js"]
+    }
   ],
+
+  "content_security_policy":"script-src 'self' https://www.gstatic.com/ https://*.firebaseio.com https://www.googleapis.com; object-src 'self'", 
 
   "permissions": [
     "activeTab",
-	"contextMenus",
-	"alarms",
+    "contextMenus",
+    "alarms",
     "storage",
-	"cookies",
-	"unlimitedStorage",
-	"https://quizlet.com/",
-	"http://www.spanishdict.com/"
-  ]
+    "cookies",
+    "unlimitedStorage",
+    "identity",
+
+    "https://quizlet.com/",
+    "http://www.spanishdict.com/"
+  ],
+
+  "oauth2": {
+    "client_id": "876856974632-m0u6s9ofaktpr5dmcclifjk9dlsefdl0.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile"
+    ]
+  },
+  "key": "dkhaijfegfglfdoamckhkabajlpekkgm"
 }
 

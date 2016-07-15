@@ -314,6 +314,19 @@ function quizletFolderTerms(data, cb) {
 	});
 }
 
+function quizletSetIdFromURL(url) {
+	if (url === undefined) {
+		console.error("quizletSetIdFromURL passed undefined argument");
+		return;
+	}
+	var match = url.match("^\/(\\d+)\/");
+	if (match === null) {
+		console.error("Set name '"+url+"' doesn't start with an ID");
+		return;
+	}
+	return parseInt(match[1]);
+}
+
 function quizletSetTerms(data, cb) {
 	if (data.setId === undefined) {
 		if (data.url === undefined) {
@@ -405,6 +418,33 @@ function quizletWriteToDB(cb) {
 		},
 		function(cb) {
 			db.close();
+			cb();
+		},
+	], cb);
+}
+
+function quizletRenderSetSelect(select, selectedURL, cb) {
+	async.waterfall([
+		function(cb) {
+			keyFromLocal("quizletSets", cb);
+		},
+		function(sets, cb) {
+			for (var i in sets.folders) {
+				var folder = sets.folders[i];
+				var optGroup = $("<optgroup/>");
+				optGroup.attr("label", folder.title);
+				select.append(optGroup);
+				for (var j in folder.sets) {
+					var set = folder.sets[j];
+					var opt = $("<option/>");
+					opt.attr("value", set.url);
+					opt.append(set.title);
+					if (selectedURL === set.url) {
+						opt.attr("selected", true);
+					}
+					optGroup.append(opt);
+				}
+			}
 			cb();
 		},
 	], cb);
